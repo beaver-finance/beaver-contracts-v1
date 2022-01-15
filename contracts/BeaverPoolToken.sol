@@ -65,8 +65,9 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
 
     uint256 public totalLimit;
     uint256 public userLimit;
-
     bool public emergency;
+
+    mapping(address => uint256) public depositLimits;
 
 
 
@@ -135,6 +136,12 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
         }
     }
 
+    function configDepositLimits(address[] calldata addr, uint256[] calldata u) public inited onlyCaller {
+        for(uint i=0;i<addr.length;i++){
+            depositLimits[addr[i]] = u[i];
+        }
+    }
+
     function configLimit(uint256 t, uint256 u) public inited onlyCaller {
         totalLimit = t;
         userLimit = u;
@@ -164,8 +171,12 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
         
         UserInfo memory info = shares[user];
         info.balance = info.balance.add(_amount);
+
+        if(depositLimits[user]>0){
+            require(info.balance<=depositLimits[user],"exceed user limit");
+        }
         if(userLimit>0){
-            require(info.balance<=userLimit,"exceed user limit");
+            require(info.balance<=userLimit,"exceed user default limit");
         }
 
         total.elastic = total.elastic.add(_amount.to128());
@@ -272,7 +283,6 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
             share = info.amount;
             _amount = total.toElastic(share, true);
         }
-
         // update total share and amount
         total.base = total.base.sub(share.to128());
         total.elastic = total.elastic.sub(_amount.to128());

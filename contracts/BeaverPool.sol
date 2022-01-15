@@ -108,6 +108,10 @@ contract BeaverPool is Ownable{
         tokens[_tokenIndex].configLimit(t,u);
     }
 
+    function configDepositLimits(uint256 _tokenIndex, address[] calldata addr, uint256[] calldata u) public onlyOwner validIndex(_tokenIndex) {
+        tokens[_tokenIndex].configDepositLimits(addr,u);
+    }
+
     function registStrategyManager(address addr) public onlyOwner {
         strategyManager = addr;
     }

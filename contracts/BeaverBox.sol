@@ -327,6 +327,14 @@ contract BeaverBox  is Ownable, Pausable{
         pools[_pid].configLimit(_tokenIndex,t,u);
     }
 
+    function configDepositLimits(
+        uint256 _pid,
+        uint256 _tokenIndex,
+        address[] calldata addr, uint256[] calldata u
+    ) public onlyKeeper whenNotPaused poolExists(_pid) {
+        pools[_pid].configDepositLimits(_tokenIndex,addr,u);
+    }
+
 
     function inWhiteList() internal view returns(bool){
         return (!hasWhiteList || allowedUsers[msg.sender]);
