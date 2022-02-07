@@ -23,7 +23,7 @@ contract Ownable is BoringOwnable {
     }
     
     function setCaller(address _caller, bool _on) public onlyOwner {
-        _setCaller(_caller, _on);
+        //_setCaller(_caller, _on);
     }
 
     function _addCaller(address _caller) internal {
@@ -43,7 +43,7 @@ contract Ownable is BoringOwnable {
     }
 
     function setKeeper(address _keeper, bool _on) public onlyOwner {
-        _setKeeper(_keeper, _on);
+        //_setKeeper(_keeper, _on);
     }
 
     function _addKeeper(address _keeper) internal {

@@ -104,7 +104,6 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
     // ************************** //
     // *** PUBLIC FUNCTIONS ***   //
     // ************************** //
-
     function status()
         public
         view
@@ -123,8 +122,9 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
         return shares[user].amount;
     }
 
-    function shareOfToBalance(address user) public view inited returns (uint256) {
-        return total.toElastic(shares[user].amount, true);
+    function shareOfToBalance(address user) public view inited returns (uint256 _amount) {
+        _amount = total.toElastic(shares[user].amount, false);
+        _amount = _amount.sub(_amount % 100);
     }
 
     //may recall when deploy exception for retry, but it only can be init once
@@ -165,7 +165,7 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
         )
     {
         // update reward first
-        harvest(user);
+        safeHarvest(user);
 
         uint256 share = total.toBase(_amount, false);
         
@@ -213,38 +213,66 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
             uint256 _reserve
         )
     {
-        // remain is the total amount in pool for withdraw
-        require(remain >= _amount, "no enougth token");
+        require(remain>0, "zero remain");
+        
+        UserInfo memory info = shares[user];
+        require(info.amount>0, "zero amount");
+
+        uint256 ba = token.balanceOf(address(this));
+        require(ba>0, "zero balance");
 
         // update reward first
-        harvest(user);
+        safeHarvest(user);
 
-        uint256 share = total.toBase(_amount, false);
-
-        UserInfo memory info = shares[user];
-
-        info.balance = info.balance.sub(_amount);
-        if (info.amount <= share) {
+        uint256 share = total.toBase(_amount, true);
+        if (info.amount < share) {
             share = info.amount;
-            _amount = total.toElastic(share, true);
+            _amount = total.toElastic(share, false);
+        }
+
+        _amount = _amount.sub(_amount % 100);
+
+        // remain is the total amount in pool for withdraw
+        require(remain.add(1) >= _amount, "no enougth tokens");
+        
+        if(info.balance>_amount){
+            info.balance = info.balance.sub(_amount);
+        }else{
             info.balance = 0;
         }
 
         _burn(user, share);
 
-
         // update total share and amount
-        total.base = total.base.sub(share.to128());
-        total.elastic = total.elastic.sub(_amount.to128());
+        if(total.base>share){
+            total.base = total.base.sub(share.to128());
+        }else{
+            total.base = 0;
+        }
+        if(total.elastic>_amount){
+            total.elastic = total.elastic.sub(_amount.to128());
+        }else{
+            total.elastic = 0;
+        }
         // transfer and update token status
-
-        token.safeTransfer(user, _amount);
-        remain = remain.sub(_amount);
+        if(remain>_amount){
+            remain = remain.sub(_amount);
+        }else{
+            remain = 0;
+        }
+        if(info.amount>share){
+            info.amount = info.amount.sub(share);
+        }else{
+            info.amount = 0;
+        }
         //update use share and reward debt
-        info.amount = info.amount.sub(share);
         info.rewardDebt = info.amount.mul(accRewardPerShare) / 1e12;
         shares[user] = info;
 
+        if(_amount > ba){
+            _amount = ba;
+        }
+        token.safeTransfer(user, _amount);
         _burned = share;
         _total = info.amount;
         _reserve = info.amount;
@@ -281,15 +309,34 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
         UserInfo memory info = shares[user];
         if (info.amount < share) {
             share = info.amount;
-            _amount = total.toElastic(share, true);
+            _amount = total.toElastic(share, false);
         }
+        
+        _amount = _amount.sub(_amount % 100);
+        
         // update total share and amount
-        total.base = total.base.sub(share.to128());
-        total.elastic = total.elastic.sub(_amount.to128());
-        // transfer and update token status
-        token.safeTransfer(user, _amount);
-        info.amount = info.amount.sub(share);
+        if(total.base>share){
+            total.base = total.base.sub(share.to128());
+        }else{
+            total.base = 0;
+        }
+        if(total.elastic>_amount){
+            total.elastic = total.elastic.sub(_amount.to128());
+        }else{
+            total.elastic = 0;
+        }
+        if(info.amount>share){
+            info.amount = info.amount.sub(share);
+        }else{
+            info.amount = 0;
+        }
         shares[user] = info;
+
+        uint256 ba = token.balanceOf(address(this));
+        if(_amount > ba){
+            _amount = ba;
+        }
+        token.safeTransfer(user, _amount);
 
         _burned = share;
         _total = info.amount;
@@ -308,7 +355,7 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
             uint256 farmId = 1;
             address farmAddr = farmPools[farmId];
             uint256 pendingRewardPerShare = accRewardPerShare;
-            if (farmAddr != address(0) && investing[farmId]) {
+            if (farmAddr != address(0)) {
                 (address rewardToken, uint256 rewardAmount) = IFarmPool(farmAddr).pendingReward();
                 _rewardToken = IERC20(rewardToken);
 
@@ -316,7 +363,12 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
 
                 if (user != address(0)) {
                     UserInfo memory info = shares[user];
-                    uint256 pending = (info.amount.mul(pendingRewardPerShare) / 1e12).sub(info.rewardDebt);
+                    uint256 pending = info.amount.mul(pendingRewardPerShare) / 1e12 ;
+                    if(pending>info.rewardDebt){
+                        pending = pending.sub(info.rewardDebt);
+                    }else{
+                        pending = 0;
+                    }
                     _amount = _amount.add(pending);
                 }
             }
@@ -360,16 +412,24 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
     function harvest(address user) public 
         inited 
         onlyCaller 
+        nonReentrant
         notEmergency
         returns (IERC20 _rewardToken, uint256 _amount) 
     {
+        return safeHarvest(user);
+    }
+
+    function safeHarvest(address user) internal 
+        returns (IERC20 _rewardToken, uint256 _amount) 
+    {
+
         _rewardToken = token;
         _amount = 0;
 
         if (total.base > 0) {
             uint256 farmId = 1; //IterableMapping.get(farmKeys, i);
             address farmAddr = farmPools[farmId];
-            if (farmAddr != address(0) && investing[farmId]) {
+            if (farmAddr != address(0)) {
                 (address rewardToken, uint256 rewardAmount) = IFarmPool(farmAddr).harvest();
 
                 _rewardToken = _harvest(routers[farmId], rewardToken, rewardAmount);
@@ -378,7 +438,13 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
                 //do nothing when payback or other owner called function
                 if (user != address(0)) {
                     UserInfo memory info = shares[user];
-                    uint256 pending = (info.amount.mul(accRewardPerShare) / 1e12).sub(info.rewardDebt);
+                    uint256 pending = info.amount.mul(accRewardPerShare) / 1e12;
+                    if(pending>info.rewardDebt){
+                        pending = pending.sub(info.rewardDebt);
+                    }else{
+                        pending = 0;
+                    }
+
                     if (pending > 0) {
                         _rewardToken.safeTransfer(user, pending);
                         info.rewardDebt = info.amount.mul(accRewardPerShare) / 1e12;
@@ -443,7 +509,6 @@ contract BeaverPoolToken is Ownable, BeaverERC20, IEmergency, ReentrancyGuard{
         _reserve = 0;
 
         require(_farmPool != address(0), "farm pool not exists");
-        require(total.elastic >= borrowed.to128(), "borrowed too many");
 
         //todo
         //_harvest(routers[_farmId],rewardToken,rewardAmount);

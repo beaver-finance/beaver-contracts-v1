@@ -143,11 +143,7 @@ contract BeaverBox  is Ownable, Pausable{
     bool public hasHedgingWhiteList;
     mapping(address => bool) public allowedUsers;
     mapping(address => bool) public hedgingUsers;
-
-    // mappings for query hedging invests
-    //mapping(address => RemovableList.Keys) hedgingUserInvestPools;
-    //mapping(address => RemovableList.Keys) hedgingTokenInPools;
-
+    
     // ******************* //
     // *** CONSTRUCTOR *** //
     // ******************* //
@@ -315,7 +311,12 @@ contract BeaverBox  is Ownable, Pausable{
         uint256 _pid,
         uint256 _tokenIndex,
         uint256 _rate
-    ) public onlyKeeper whenNotPaused poolExists(_pid) {
+    ) 
+        public 
+        onlyKeeper 
+        whenNotPaused 
+        poolExists(_pid) 
+    {
         pools[_pid].setTargetFundUtilizationRate(_tokenIndex, _rate);
     }
 
@@ -323,7 +324,12 @@ contract BeaverBox  is Ownable, Pausable{
         uint256 _pid,
         uint256 _tokenIndex,
         uint256 t, uint256 u
-    )public onlyKeeper whenNotPaused poolExists(_pid) {
+    )
+        public 
+        onlyKeeper 
+        whenNotPaused 
+        poolExists(_pid) 
+    {
         pools[_pid].configLimit(_tokenIndex,t,u);
     }
 
@@ -331,7 +337,12 @@ contract BeaverBox  is Ownable, Pausable{
         uint256 _pid,
         uint256 _tokenIndex,
         address[] calldata addr, uint256[] calldata u
-    ) public onlyKeeper whenNotPaused poolExists(_pid) {
+    ) 
+        public 
+        onlyKeeper 
+        whenNotPaused 
+        poolExists(_pid) 
+    {
         pools[_pid].configDepositLimits(_tokenIndex,addr,u);
     }
 
@@ -401,8 +412,8 @@ contract BeaverBox  is Ownable, Pausable{
         _amount = amount;
     }
 
-    function harvest(uint256 _pid, uint256 _tokenIndex) public 
-        whenNotPaused
+    function harvest(uint256 _pid, uint256 _tokenIndex) 
+        public 
         poolExists(_pid) 
     {
         (IERC20 rewardToken, uint256 amount) = pools[_pid].harvest(_tokenIndex, msg.sender);
@@ -415,7 +426,6 @@ contract BeaverBox  is Ownable, Pausable{
         uint256 farmId
     ) public 
         onlyKeeper 
-        whenNotPaused 
         poolExists(_pid) 
     {
         (address _farmPool, uint256 _amount, uint256 _reserve) = pools[_pid].invest(_tokenIndex, farmId);
@@ -434,13 +444,13 @@ contract BeaverBox  is Ownable, Pausable{
         whenNotPaused 
         poolExists(_pid) 
     {
-        (address _farmPool, uint256 _amount, uint256 _reserve) = pools[_pid].payback(
-            _tokenIndex,
-            _farmId,
-            borrowed,
-            amount
-        );
-        emit LogPayback(pools[_pid].tokenFromIndex(_tokenIndex), _farmPool, _pid, _amount, _reserve);
+        //(address _farmPool, uint256 _amount, uint256 _reserve) = pools[_pid].payback(
+        //    _tokenIndex,
+        //    _farmId,
+        //    borrowed,
+        //    amount
+        //);
+        //emit LogPayback(pools[_pid].tokenFromIndex(_tokenIndex), _farmPool, _pid, _amount, _reserve);
     }
 
     function registerStrategyManager(uint256 _pid, address addr) public 
@@ -482,20 +492,6 @@ contract BeaverBox  is Ownable, Pausable{
             pools[_pid].tokenFromIndex(_tokenIndex), 
             _farmPool, _pid, _tokenIndex, _farmId
         );
-    }
-
-    function Pause()public 
-        onlyKeeper 
-        whenNotPaused
-    {
-        _pause();
-    }
-
-    function UnPause()public 
-        onlyKeeper 
-        whenPaused
-    {
-        _unpause();
     }
 
     // ************************** //
